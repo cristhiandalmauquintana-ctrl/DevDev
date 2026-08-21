@@ -8,6 +8,16 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
+
+// Permitir que cualquier sitio pueda embeber este editor en un <iframe>.
+// Por defecto los navegadores lo bloquean; estos headers lo autorizan explícitamente.
+app.use((req, res, next) => {
+  res.removeHeader('X-Frame-Options'); // header viejo que bloquearía el embed
+  res.setHeader('Content-Security-Policy', 'frame-ancestors *'); // header moderno: permite embeber desde cualquier dominio
+  res.setHeader('Access-Control-Allow-Origin', '*'); // permite que el JS del editor llame a /api/file aunque esté embebido en otro dominio
+  next();
+});
+
 app.use(express.static('public')); // aquí sirve el index.html del editor
 
 const PORT = process.env.PORT || 3000;
