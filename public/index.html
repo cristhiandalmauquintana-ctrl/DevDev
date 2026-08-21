@@ -83,6 +83,51 @@
     50%{ opacity:0.6; box-shadow:0 0 0 5px rgba(34,211,201,0);}
   }
 
+  /* Barra de proyecto (nombre + guardar) */
+  .project-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  #project-name{
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:6px;
+    width:160px;
+    outline:none;
+  }
+  #project-name:focus{ border-color: var(--accent); }
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:12px;
+    font-weight:600;
+    border:none;
+    border-radius:6px;
+    padding:7px 14px;
+    cursor:pointer;
+    transition: opacity 0.15s ease;
+  }
+  .btn:hover{ opacity:0.85; }
+  .btn-primary{
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-ghost{
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  #save-status{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color: var(--text-dim);
+    min-width:90px;
+  }
+
   /* Tabs */
   .tabs{
     display:flex;
@@ -156,6 +201,12 @@
     <div class="brand">
       <div class="brand-mark"></div>
       <div class="brand-name">Code Studio</div>
+    </div>
+    <div class="project-bar">
+      <input id="project-name" type="text" value="mi-juego" spellcheck="false" />
+      <button class="btn btn-ghost" id="btn-load">Cargar</button>
+      <button class="btn btn-primary" id="btn-save">Guardar</button>
+      <span id="save-status"></span>
     </div>
     <div class="live-badge">
       <div class="live-dot"></div>
@@ -256,7 +307,68 @@
     `;
     document.getElementById('preview').srcdoc = combined;
   }
+
+  // Guarda cada uno de los 3 archivos del proyecto en GitHub, vía el backend.
+  // Cada archivo recuerda su "sha" (una huella de GitHub) para poder actualizarlo sin conflictos.
+  const fileMeta = { html: {}, css: {}, js: {} };
+  const nameMap = { html: 'index.html', css: 'style.css', js: 'script.js' };
+
+  async function guardarProyecto() {
+    const status = document.getElementById('save-status');
+    const project = document.getElementById('project-name').value.trim();
+    if (!project) { status.textContent = 'Ponle nombre al proyecto'; return; }
+
+    status.textContent = 'Guardando...';
+    try {
+      for (const key of ['html', 'css', 'js']) {
+        const path = `${project}/${nameMap[key]}`;
+        const res = await fetch('/api/file', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path,
+            content: files[key].value,
+            sha: fileMeta[key].sha || null
+          })
+        });
+        const data = await res.json();
+        if (data.sha) fileMeta[key].sha = data.sha;
+      }
+      status.textContent = 'Guardado ✓';
+    } catch (e) {
+      status.textContent = 'Error al guardar';
+    }
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  }
+
+  // Carga los 3 archivos del proyecto desde GitHub
+  async function cargarProyecto() {
+    const status = document.getElementById('save-status');
+    const project = document.getElementById('project-name').value.trim();
+    if (!project) { status.textContent = 'Ponle nombre al proyecto'; return; }
+
+    status.textContent = 'Cargando...';
+    try {
+      for (const key of ['html', 'css', 'js']) {
+        const path = `${project}/${nameMap[key]}`;
+        const res = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        files[key].value = data.content || '';
+        fileMeta[key].sha = data.sha || null;
+      }
+      editor.setValue(files[currentFile].value);
+      updatePreview();
+      status.textContent = 'Cargado ✓';
+    } catch (e) {
+      status.textContent = 'Error al cargar';
+    }
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  }
+
+  document.getElementById('btn-save').addEventListener('click', guardarProyecto);
+  document.getElementById('btn-load').addEventListener('click', cargarProyecto);
 </script>
 
 </body>
 </html>
+
