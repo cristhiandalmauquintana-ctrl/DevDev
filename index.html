@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Code Studio — Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0d14;
+    --panel: #12141c;
+    --panel-2: #171a24;
+    --border: #232635;
+    --text: #e6e6f0;
+    --text-dim: #8b8fa3;
+    --accent: #7c5cff;
+    --accent-soft: rgba(124,92,255,0.15);
+    --live: #22d3c9;
+  }
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  html, body{ height:100%; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+  }
+  .app{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+  }
+
+  /* Top bar */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 10px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink:0;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .brand-mark{
+    width:22px; height:22px;
+    border-radius:6px;
+    background: linear-gradient(135deg, var(--accent), var(--live));
+    flex-shrink:0;
+  }
+  .brand-name{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:0.2px;
+  }
+  .live-badge{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-family:'Space Grotesk', sans-serif;
+    font-size:12px;
+    font-weight:600;
+    color: var(--live);
+    background: rgba(34,211,201,0.1);
+    border:1px solid rgba(34,211,201,0.3);
+    padding:5px 12px;
+    border-radius:20px;
+  }
+  .live-dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    background: var(--live);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; box-shadow:0 0 0 0 rgba(34,211,201,0.5);}
+    50%{ opacity:0.6; box-shadow:0 0 0 5px rgba(34,211,201,0);}
+  }
+
+  /* Tabs */
+  .tabs{
+    display:flex;
+    gap:2px;
+    padding: 0 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink:0;
+  }
+  .tab{
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    color: var(--text-dim);
+    padding: 9px 16px;
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+    user-select:none;
+  }
+  .tab:hover{ color: var(--text); }
+  .tab.active{
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Main split */
+  .main{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+  .editor-pane{
+    flex:1;
+    min-width:0;
+    border-right: 1px solid var(--border);
+  }
+  .preview-pane{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    background: var(--panel-2);
+  }
+  .preview-header{
+    padding: 8px 16px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    flex-shrink:0;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+  }
+  #preview{
+    flex:1;
+    width:100%;
+    border:none;
+    background:#fff;
+  }
+
+  #monaco-container{
+    width:100%;
+    height:100%;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">Code Studio</div>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      VISTA EN VIVO
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-file="html">index.html</div>
+    <div class="tab" data-file="css">style.css</div>
+    <div class="tab" data-file="js">script.js</div>
+  </div>
+
+  <div class="main">
+    <div class="editor-pane">
+      <div id="monaco-container"></div>
+    </div>
+    <div class="preview-pane">
+      <div class="preview-header">Vista previa</div>
+      <iframe id="preview" sandbox="allow-scripts"></iframe>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+<script>
+  // Contenido inicial de cada archivo
+  const files = {
+    html: {
+      language: 'html',
+      value: `<h1>¡Hola, juego!</h1>\n<p>Edita este archivo y mira cómo cambia la vista previa.</p>\n<canvas id="game" width="300" height="150"></canvas>`
+    },
+    css: {
+      language: 'css',
+      value: `body {\n  font-family: sans-serif;\n  text-align: center;\n  padding: 20px;\n}\ncanvas {\n  background: #222;\n  border-radius: 8px;\n}`
+    },
+    js: {
+      language: 'javascript',
+      value: `const canvas = document.getElementById('game');\nconst ctx = canvas.getContext('2d');\nlet x = 0;\n\nfunction loop() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n  ctx.fillStyle = '#7c5cff';\n  ctx.fillRect(x, 60, 30, 30);\n  x = (x + 2) % canvas.width;\n  requestAnimationFrame(loop);\n}\nloop();`
+    }
+  };
+
+  let currentFile = 'html';
+  let editor;
+
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+  require(['vs/editor/editor.main'], function () {
+
+    monaco.editor.defineTheme('studio-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#0b0d14',
+      }
+    });
+
+    editor = monaco.editor.create(document.getElementById('monaco-container'), {
+      value: files[currentFile].value,
+      language: files[currentFile].language,
+      theme: 'studio-dark',
+      fontFamily: 'JetBrains Mono, monospace',
+      fontSize: 13,
+      minimap: { enabled: false },
+      automaticLayout: true,
+      padding: { top: 16 }
+    });
+
+    editor.onDidChangeModelContent(() => {
+      files[currentFile].value = editor.getValue();
+      updatePreview();
+    });
+
+    updatePreview();
+  });
+
+  // Cambiar de pestaña
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentFile = tab.dataset.file;
+      editor.setValue(files[currentFile].value);
+      monaco.editor.setModelLanguage(editor.getModel(), files[currentFile].language);
+    });
+  });
+
+  // Combinar los 3 archivos y renderizar en el iframe
+  function updatePreview() {
+    const combined = `
+      <html>
+        <head><style>${files.css.value}</style></head>
+        <body>
+          ${files.html.value}
+          <script>${files.js.value}<\/script>
+        </body>
+      </html>
+    `;
+    document.getElementById('preview').srcdoc = combined;
+  }
+</script>
+
+</body>
+</html>
